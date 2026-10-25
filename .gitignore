@@ -1,0 +1,29 @@
+# Dépendances
+node_modules/
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Builds et caches
+dist/
+build/
+coverage/
+.pytest_cache/
+.ruff_cache/
+*.tsbuildinfo
+
+# Configuration locale et secrets
+.env
+.env.*
+!.env.example
+
+# Logs
+*.log
+npm-debug.log*
+
+# Éditeurs / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
