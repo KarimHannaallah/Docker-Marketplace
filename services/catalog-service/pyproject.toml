@@ -1,0 +1,21 @@
+[project]
+name = "catalog-service"
+version = "1.0.0"
+description = "Catalogue : catégories et produits"
+requires-python = ">=3.12"
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+# E/W : style, F : erreurs, I : tri des imports, B : bugs courants
+select = ["E", "W", "F", "I", "B"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+
+[tool.ruff.lint.flake8-bugbear]
+# Depends(...) et Query(...) dans les valeurs par défaut sont l'idiome normal de FastAPI
+extend-immutable-calls = ["fastapi.Depends", "fastapi.Query"]
