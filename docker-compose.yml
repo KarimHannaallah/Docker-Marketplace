@@ -1,0 +1,98 @@
+# Lancer toute l'application :  cp .env.example .env  puis  docker compose up --build
+# Application disponible sur http://localhost:8080 (port modifiable avec FRONTEND_PORT).
+#
+# Réseaux :
+#   frontend : réseau "public", seul le conteneur frontend (nginx) y est relié à l'extérieur
+#   backend  : réseau INTERNE (internal: true) : pas d'accès depuis l'extérieur, ni vers Internet
+# Seul le frontend publie un port : backends et base de données ne sont pas joignables par les clients.
+
+name: marketplace
+
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:?POSTGRES_USER manquant dans .env}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD manquant dans .env}
+      POSTGRES_DB: ${POSTGRES_DB:?POSTGRES_DB manquant dans .env}
+    volumes:
+      # Données conservées entre deux redémarrages
+      - db-data:/var/lib/postgresql/data
+      # Scripts SQL exécutés UNE SEULE FOIS, à la création du volume (schémas auth, catalog, orders)
+      - ./db/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    networks: [backend]
+    restart: unless-stopped
+
+  auth-service:
+    build: ./services/auth-service
+    environment:
+      DATABASE_URL: ${DATABASE_URL:?DATABASE_URL manquant dans .env}
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET manquant dans .env}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-1h}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:?ADMIN_EMAIL manquant dans .env}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:?ADMIN_PASSWORD manquant dans .env}
+      ADMIN_NAME: ${ADMIN_NAME:-Administrateur}
+    depends_on:
+      db:
+        condition: service_healthy
+    networks: [backend]
+    restart: unless-stopped
+
+  catalog-service:
+    build: ./services/catalog-service
+    environment:
+      DATABASE_URL: ${DATABASE_URL:?DATABASE_URL manquant dans .env}
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET manquant dans .env}
+      AUTH_SERVICE_URL: http://auth-service:3001
+    depends_on:
+      db:
+        condition: service_healthy
+      auth-service:
+        condition: service_healthy
+    networks: [backend]
+    restart: unless-stopped
+
+  order-service:
+    build: ./services/order-service
+    environment:
+      DATABASE_URL: ${DATABASE_URL:?DATABASE_URL manquant dans .env}
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET manquant dans .env}
+      AUTH_SERVICE_URL: http://auth-service:3001
+      CATALOG_SERVICE_URL: http://catalog-service:8000
+    depends_on:
+      db:
+        condition: service_healthy
+      auth-service:
+        condition: service_healthy
+      catalog-service:
+        condition: service_healthy
+    networks: [backend]
+    restart: unless-stopped
+
+  frontend:
+    build: ./frontend
+    ports:
+      # Seul port publié de toute l'application
+      - "${FRONTEND_PORT:-8080}:80"
+    depends_on:
+      auth-service:
+        condition: service_healthy
+      catalog-service:
+        condition: service_healthy
+      order-service:
+        condition: service_healthy
+    networks: [frontend, backend]
+    restart: unless-stopped
+
+volumes:
+  db-data:
+
+networks:
+  frontend:
+  backend:
+    internal: true

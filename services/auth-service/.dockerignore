@@ -1,0 +1,10 @@
+# Ne pas envoyer au démon Docker ce qui est inutile (ou dangereux) dans l'image
+node_modules
+dist
+coverage
+tests
+.env
+.env.*
+*.log
+Dockerfile
+.dockerignore
