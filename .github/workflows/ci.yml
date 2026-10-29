@@ -17,7 +17,7 @@ jobs:
     name: Node (${{ matrix.service }})
     runs-on: ubuntu-latest
     strategy:
-      fail-fast: false
+      fail-fast: true
       matrix:
         service: [auth-service, order-service]
     defaults:
@@ -76,7 +76,7 @@ jobs:
     name: Hadolint (${{ matrix.dockerfile }})
     runs-on: ubuntu-latest
     strategy:
-      fail-fast: false
+      fail-fast: true
       matrix:
         dockerfile:
           - frontend/Dockerfile
@@ -89,13 +89,21 @@ jobs:
         with:
           dockerfile: ${{ matrix.dockerfile }}
 
-  # --- Validation du docker-compose.yml (avec les valeurs d'exemple de .env.example) ---
   compose:
-    name: Docker Compose config
+    name: Docker Compose config (environnements)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      - run: docker compose --env-file .env.example config --quiet
+      - name: Valider chaque fichier d'environnement
+        run: |
+          status=0
+          for env_file in .env.example .env.test.example .env.uat.example .env.prod.example; do
+            echo "::group::docker compose --env-file $env_file config"
+            docker compose --env-file "$env_file" config --quiet || status=1
+            echo "::endgroup::"
+          done
+          # On teste tous les fichiers avant d'échouer, pour voir toutes les erreurs d'un coup.
+          exit $status
 
   # --- Détection de secrets (mots de passe, clés...) dans le code ET dans tout l'historique git ---
   gitleaks:
@@ -125,7 +133,7 @@ jobs:
       contents: read
       packages: write
     strategy:
-      fail-fast: false
+      fail-fast: true
       matrix:
         include:
           - image: frontend
