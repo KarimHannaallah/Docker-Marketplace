@@ -1,18 +1,23 @@
 import { Router } from 'express';
 import { authenticate } from '../middleware/auth';
+import type { RateLimiters } from '../middleware/rateLimit';
 import type { AuthService } from '../services/authService';
 import { parseLogin, parseRegister } from '../validation';
 
-export function authRoutes(service: AuthService): Router {
+export function authRoutes(service: AuthService, limiters: RateLimiters): Router {
   const router = Router();
   const requireAuth = authenticate(service);
 
-  router.post('/register', async (req, res) => {
+  // Limite générale sur toutes les routes de ce router (déclarée AVANT les routes).
+  router.use(limiters.general);
+
+  // Limite stricte en plus sur les deux routes sensibles au brute force et à la création de comptes en masse.
+  router.post('/register', limiters.strict, async (req, res) => {
     const { name, email, password } = parseRegister(req.body);
     res.status(201).json(await service.register(name, email, password));
   });
 
-  router.post('/login', async (req, res) => {
+  router.post('/login', limiters.strict, async (req, res) => {
     const { email, password } = parseLogin(req.body);
     res.json(await service.login(email, password));
   });

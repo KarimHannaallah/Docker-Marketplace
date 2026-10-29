@@ -13,12 +13,30 @@ function required(env: NodeJS.ProcessEnv, key: string): string {
   return value;
 }
 
+/**
+ * Les adresses des autres services servent à construire des requêtes HTTP sortantes : une valeur erronée ou
+ * malveillante (file://, javascript:, texte quelconque...) doit faire échouer le démarrage, pas être utilisée.
+ */
+function httpUrl(env: NodeJS.ProcessEnv, key: string, fallback: string): string {
+  const value = env[key] ?? fallback;
+  let url: URL;
+  try {
+    url = new URL(value);
+  } catch {
+    throw new Error(`${key} n'est pas une URL valide : ${value}`);
+  }
+  if (url.protocol !== 'http:' && url.protocol !== 'https:') {
+    throw new Error(`${key} doit commencer par http:// ou https:// (reçu : ${url.protocol})`);
+  }
+  return value;
+}
+
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
   return {
     port: Number(env.ORDER_PORT ?? 3002),
     databaseUrl: required(env, 'DATABASE_URL'),
     jwtSecret: required(env, 'JWT_SECRET'),
-    authServiceUrl: env.AUTH_SERVICE_URL ?? 'http://auth-service:3001',
-    catalogServiceUrl: env.CATALOG_SERVICE_URL ?? 'http://catalog-service:8000',
+    authServiceUrl: httpUrl(env, 'AUTH_SERVICE_URL', 'http://auth-service:3001'),
+    catalogServiceUrl: httpUrl(env, 'CATALOG_SERVICE_URL', 'http://catalog-service:8000'),
   };
 }

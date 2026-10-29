@@ -95,6 +95,7 @@ Elles sont toutes dans `.env.example` (à copier en `.env`, jamais commité).
 | `DATABASE_URL` | `postgresql://marketplace:change-me@db:5432/marketplace` | les 3 services. **Doit rester cohérente** avec les trois variables ci-dessus |
 | `JWT_SECRET` | `change-me-to-a-long-random-string` | les 3 services (signature et vérification). **À changer en production** |
 | `JWT_EXPIRES_IN` | `1h` | `auth-service` (durée de vie du token) |
+| `RATE_LIMIT_WINDOW_MS`, `RATE_LIMIT_MAX`, `AUTH_RATE_LIMIT_MAX` | `900000` (15 min), `100`, `10` | `auth-service` : limitation du débit par IP (fenêtre en millisecondes ; requêtes max sur toutes les routes ; requêtes max sur `POST /auth/register` et `POST /auth/login`) |
 | `ADMIN_EMAIL`, `ADMIN_PASSWORD`, `ADMIN_NAME` | `admin@example.com`, `change-me-admin`, `Administrateur` | `auth-service` (seed de l'admin, sans effet s'il existe déjà) |
 | `COMPOSE_PROJECT_NAME` | `marketplace` | Compose : préfixe des conteneurs, réseaux et volumes (distinct par environnement, voir « Environnements ») |
 | `FRONTEND_PORT` | `8080` | `docker-compose.yml` (seul port publié) |
@@ -233,6 +234,12 @@ Chaque service expose `GET /health`. Depuis le navigateur, tous les appels passe
 | GET | `/orders/:id` | token | Détail de **sa** commande ; 404 pour la commande d'un autre utilisateur |
 
 Les réponses d'erreur ont la forme `{ "error": "message" }` (services Node) ou `{ "detail": "message" }` (FastAPI).
+
+**Limitation du débit** : `auth-service` répond **429** (`Too Many Requests`, avec l'en-tête `Retry-After`) au-delà de 100 requêtes
+par adresse IP et par 15 minutes, et au-delà de 10 pour `POST /auth/register` et `POST /auth/login`. L'adresse du client est
+celle que nginx transmet dans `X-Forwarded-For` (`trust proxy` = 1 : un client ne peut pas la falsifier). `GET /auth/verify`
+n'est pas limité quand il est appelé par `catalog-service` et `order-service` (appels directs, sans `X-Forwarded-For`), car
+ils l'appellent à chaque requête utilisateur ; il reste limité s'il est appelé depuis l'extérieur.
 
 ## Pages du frontend
 

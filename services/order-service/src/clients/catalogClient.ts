@@ -18,10 +18,17 @@ export class HttpCatalogClient implements CatalogClient {
   constructor(private readonly baseUrl: string) {}
 
   async getProduct(id: number, token: string): Promise<CatalogProduct | null> {
+    // L'id vient (indirectement) d'une requête utilisateur : on n'accepte qu'un entier positif sûr, de sorte qu'il
+    // ne puisse jamais contenir de "/", "..", "?" ou "@" capables de changer la destination de la requête (SSRF).
+    if (!Number.isSafeInteger(id) || id <= 0) throw new HttpError(400, 'Identifiant produit invalide');
+
+    // L'URL est construite par `new URL` : le chemin est relatif à l'adresse du catalogue (validée au démarrage).
+    const url = new URL(`/catalog/products/${encodeURIComponent(String(id))}`, this.baseUrl);
+
     let response: Response;
     try {
       // On transmet le JWT de l'utilisateur : catalog-service protège toutes ses routes.
-      response = await fetch(`${this.baseUrl}/catalog/products/${id}`, {
+      response = await fetch(url, {
         headers: { Authorization: `Bearer ${token}` },
         signal: AbortSignal.timeout(3000),
       });

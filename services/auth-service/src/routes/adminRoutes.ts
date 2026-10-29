@@ -1,10 +1,14 @@
 import { Router } from 'express';
 import { authenticate, requireAdmin } from '../middleware/auth';
+import type { RateLimiters } from '../middleware/rateLimit';
 import type { AuthService } from '../services/authService';
 import { parseId } from '../validation';
 
-export function adminRoutes(service: AuthService): Router {
+export function adminRoutes(service: AuthService, limiters: RateLimiters): Router {
   const router = Router();
+  // La limite passe AVANT l'authentification : une requête sans token compte aussi (sinon on pourrait
+  // solliciter la base sans limite en envoyant des tokens invalides).
+  router.use(limiters.general);
   router.use(authenticate(service), requireAdmin);
 
   router.get('/users', async (_req, res) => {

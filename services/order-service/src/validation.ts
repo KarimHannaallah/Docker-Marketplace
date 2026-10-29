@@ -5,7 +5,7 @@ const MAX_QUANTITY = 99;
 
 export function parsePositiveInt(value: unknown, label: string): number {
   const n = typeof value === 'string' ? Number(value) : value;
-  if (typeof n !== 'number' || !Number.isInteger(n) || n <= 0) {
+  if (typeof n !== 'number' || !Number.isSafeInteger(n) || n <= 0) {
     throw new HttpError(400, `${label} invalide`);
   }
   return n;

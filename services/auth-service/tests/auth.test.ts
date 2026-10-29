@@ -10,6 +10,9 @@ const config: Config = {
   jwtSecret: 'test-secret',
   jwtExpiresIn: '1h',
   bcryptRounds: 4, // rapide pour les tests
+  // Limites très hautes : les tests de ce fichier ne doivent jamais être ralentis par la limitation
+  // (elle est testée à part dans rateLimit.test.ts).
+  rateLimit: { windowMs: 60_000, max: 100_000, authMax: 100_000 },
   adminEmail: 'admin@test.com',
   adminPassword: 'admin-password',
   adminName: 'Admin',
@@ -21,7 +24,7 @@ let service: AuthService;
 beforeEach(async () => {
   service = new AuthService(new InMemoryUserRepository(), new InMemoryTokenRepository(), config);
   await service.ensureAdmin();
-  app = createApp(service);
+  app = createApp(service, config.rateLimit);
 });
 
 async function register(email: string, password = 'password123', name = 'Alice') {

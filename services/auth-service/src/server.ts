@@ -29,7 +29,7 @@ async function main(): Promise<void> {
   const service = new AuthService(new PgUserRepository(pool), new PgTokenRepository(pool), config);
   if (await service.ensureAdmin()) console.log(`Compte admin créé : ${config.adminEmail}`);
 
-  createApp(service).listen(config.port, () => {
+  createApp(service, config.rateLimit).listen(config.port, () => {
     console.log(`auth-service à l'écoute sur le port ${config.port}`);
   });
 }
