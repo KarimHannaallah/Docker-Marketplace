@@ -96,12 +96,60 @@ Elles sont toutes dans `.env.example` (à copier en `.env`, jamais commité).
 | `JWT_SECRET` | `change-me-to-a-long-random-string` | les 3 services (signature et vérification). **À changer en production** |
 | `JWT_EXPIRES_IN` | `1h` | `auth-service` (durée de vie du token) |
 | `ADMIN_EMAIL`, `ADMIN_PASSWORD`, `ADMIN_NAME` | `admin@example.com`, `change-me-admin`, `Administrateur` | `auth-service` (seed de l'admin, sans effet s'il existe déjà) |
+| `COMPOSE_PROJECT_NAME` | `marketplace` | Compose : préfixe des conteneurs, réseaux et volumes (distinct par environnement, voir « Environnements ») |
 | `FRONTEND_PORT` | `8080` | `docker-compose.yml` (seul port publié) |
+| `DB_`, `AUTH_`, `CATALOG_`, `ORDER_`, `FRONTEND_` + `CPU_LIMIT`, `MEM_LIMIT`, `CPU_RESERVATION`, `MEM_RESERVATION` | voir `.env.example` | `docker-compose.yml` (plafond et minimum garanti de CPU et de mémoire par conteneur) |
 | `POSTGRES_HOST`, `POSTGRES_PORT` | `db`, `5432` | information : non lues par compose |
 | `AUTH_PORT`, `CATALOG_PORT`, `ORDER_PORT` | `3001`, `8000`, `3002` | développement local sans Docker. Dans Docker, les ports sont fixés par les images |
 | `AUTH_SERVICE_URL`, `CATALOG_SERVICE_URL` | `http://auth-service:3001`, `http://catalog-service:8000` | développement local ; `docker-compose.yml` fixe ces valeurs lui-même |
 
 Compose refuse de démarrer si une variable obligatoire manque, avec un message qui nomme la variable.
+
+## Environnements
+
+Le même `docker-compose.yml` sert à quatre environnements. Chacun a son fichier modèle, qui change
+seulement des variables : nom de projet, port, base de données, secrets, durée des tokens et ressources.
+
+| Environnement | Fichier modèle | Projet Compose | Port | Durée du JWT | Ressources | Base PostgreSQL |
+|---|---|---|---|---|---|---|
+| Développement (défaut) | `.env.example` | `marketplace` | 8080 | 1h | moyennes | `marketplace` |
+| **TEST** | `.env.test.example` | `marketplace-test` | **8081** | **8h** | basses | `marketplace_test` |
+| **UAT** | `.env.uat.example` | `marketplace-uat` | **8082** | **2h** | moyennes | `marketplace_uat` |
+| **PROD** | `.env.prod.example` | `marketplace-prod` | **80** | **30m** | hautes | `marketplace_prod` |
+
+Limites de ressources par conteneur (CPU / mémoire) :
+
+| Service | TEST (basses) | UAT (moyennes) | PROD (hautes) |
+|---|---|---|---|
+| db | 0,5 / 256 Mo | 1 / 512 Mo | 2 / 1 Go |
+| auth, catalog, order | 0,25 / 192 Mo | 0,5 / 256 Mo | 1 / 512 Mo |
+| frontend | 0,1 / 64 Mo | 0,25 / 128 Mo | 0,5 / 256 Mo |
+
+**Utilisation** : copiez le modèle (la copie est ignorée par git) et donnez-le à Compose avec `--env-file` :
+
+```bash
+cp .env.test.example .env.test
+cp .env.uat.example  .env.uat
+
+docker compose --env-file .env.test up -d --build    # http://localhost:8081
+docker compose --env-file .env.uat  up -d --build    # http://localhost:8082, en même temps que TEST
+
+docker compose --env-file .env.test ps               # état de TEST
+docker compose --env-file .env.test down -v          # arrête TEST et efface ses données
+```
+
+Passez **toujours** `--env-file` (y compris pour `ps`, `logs` et `down`) : sans lui, Compose lit `.env` et cible
+l'environnement de développement.
+
+**Pourquoi plusieurs environnements peuvent tourner en même temps** : la variable `COMPOSE_PROJECT_NAME` de chaque
+fichier préfixe les conteneurs, les réseaux et le volume (`marketplace-test_db-data`, `marketplace-uat_db-data`).
+Ils ont donc chacun leur propre PostgreSQL, leur base et leur port. Les secrets JWT sont différents : un token émis
+en TEST est refusé en UAT et en PROD. Les comptes et les données ne sont pas partagés.
+
+**PROD** : toutes les valeurs `CHANGE_ME` de `.env.prod.example` (mot de passe de la base, secret JWT, mot de passe
+admin) doivent être remplacées par des secrets générés avant le démarrage, par exemple avec `openssl rand -base64 48`.
+Le mot de passe de la base apparaît deux fois (`POSTGRES_PASSWORD` et `DATABASE_URL`) : gardez-les identiques.
+Le port 80 doit être libre. Ne commitez jamais `.env.prod`.
 
 ## Endpoints
 
@@ -223,6 +271,9 @@ Les tests unitaires n'ont besoin ni de PostgreSQL ni des autres services.
 .
 ├── docker-compose.yml        Orchestration des 5 conteneurs (seul le frontend publie un port)
 ├── .env.example              Variables d'environnement (à copier en .env)
+├── .env.test.example         Modèles des environnements TEST, UAT et PROD (--env-file)
+├── .env.uat.example
+├── .env.prod.example
 ├── .gitleaks.toml            Configuration du scan de secrets
 ├── .github/workflows/        ci.yml (tests, lint, scans, images) et codeql.yml
 ├── db/init/01_schemas.sql    Schémas et tables PostgreSQL

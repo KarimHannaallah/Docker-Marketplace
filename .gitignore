@@ -16,7 +16,9 @@ coverage/
 # Configuration locale et secrets
 .env
 .env.*
+# Les modèles (sans secrets réels) restent versionnés : .env.example, .env.test.example, etc.
 !.env.example
+!.env.*.example
 
 # Logs
 *.log
