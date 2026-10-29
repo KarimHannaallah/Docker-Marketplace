@@ -1,7 +1,8 @@
 # Exigences du sujet → où elles sont satisfaites
 
 Ce document relie chaque exigence du sujet au fichier (ou au job CI) qui la satisfait, avec la manière de la vérifier.
-Les chemins sont relatifs à la racine du dépôt.
+Les chemins sont relatifs à la racine du dépôt. Les sections 1 à 7 couvrent le sujet et le bonus sécurité ;
+la section 8 couvre les exigences complémentaires (ressources, environnements, conteneurs sans droits root, versions).
 
 ## 1. Architecture et conteneurs
 
@@ -64,7 +65,8 @@ Les chemins sont relatifs à la racine du dépôt.
 | Tests et ruff du service Python | Job `python-service` : `ruff check .`, `pytest` |
 | Lint et build du frontend | Job `frontend` : `npm run lint`, `npm run build` |
 | hadolint sur les 4 Dockerfiles | Job `hadolint` (matrice des 4 Dockerfiles) |
-| Validation de `docker compose config` | Job `compose` |
+| Validation de `docker compose config` | Job `compose` : teste `.env.example` et les 3 fichiers `.env.test.example`, `.env.uat.example`, `.env.prod.example` (échoue si une variable obligatoire manque) |
+| `fail-fast: true` dans les 3 matrices | Matrices des jobs `node-services`, `hadolint` et `docker` de [ci.yml](../.github/workflows/ci.yml) (la matrice de [codeql.yml](../.github/workflows/codeql.yml) reste en `false`) |
 | Job `docker` en matrice sur les 4 images, dépendant de tous les jobs précédents | Job `docker` : `needs: [node-services, python-service, frontend, hadolint, compose, gitleaks]` |
 | Build et push sur GHCR `ghcr.io/<owner>/<repo>/<service>` en minuscules | Étape « Nom d'image en minuscules » puis « Build et push » du job `docker` |
 | Tag `sha-<short sha>` à chaque commit ; nom du tag git sur un push de tag ; `latest` sur `main` uniquement | Étape « Tags et labels » (`docker/metadata-action`) |
@@ -78,3 +80,48 @@ Les chemins sont relatifs à la racine du dépôt.
 | Scan Trivy de chaque image, échec si vulnérabilité CRITICAL corrigeable | Étape « Scan Trivy » du job `docker` : `--severity CRITICAL --ignore-unfixed --exit-code 1`, exécutée **avant** la publication |
 | Job gitleaks | Job `gitleaks` de [ci.yml](../.github/workflows/ci.yml) (historique complet) ; configuration : [.gitleaks.toml](../.gitleaks.toml) |
 | Workflow CodeQL (JavaScript et Python) | [codeql.yml](../.github/workflows/codeql.yml) (matrice `javascript-typescript`, `python`) |
+
+## 8. Exigences complémentaires : ressources, environnements, durcissement, versions
+
+### Limites de ressources
+
+| Exigence | Où elle est satisfaite | Comment le vérifier |
+|---|---|---|
+| Limites **et** réservations CPU/mémoire sur les 5 services | [docker-compose.yml](../docker-compose.yml) : bloc `deploy.resources` (`limits` et `reservations`) sur `db`, `auth-service`, `catalog-service`, `order-service` et `frontend` | `docker inspect` : `NanoCpus`, `Memory`, `MemoryReservation` |
+| Valeurs réglables par variables, avec défaut : db 1 CPU / 512 Mo, services 0,5 / 256 Mo, frontend 0,25 / 128 Mo | Variables `DB_`, `AUTH_`, `CATALOG_`, `ORDER_`, `FRONTEND_` + `CPU_LIMIT`, `MEM_LIMIT`, `CPU_RESERVATION`, `MEM_RESERVATION` : syntaxe `${VAR:-défaut}` dans [docker-compose.yml](../docker-compose.yml), liste dans [.env.example](../.env.example) | `docker stats --no-stream` : la colonne `MEM USAGE / LIMIT` affiche 512 Mo, 256 Mo et 128 Mo |
+| Documentation | [README](../README.md#ressources-des-conteneurs) : tableau des valeurs, comportement au dépassement, consommation observée | — |
+
+### Environnements
+
+| Exigence | Où elle est satisfaite | Comment le vérifier |
+|---|---|---|
+| Fichiers `.env.test.example`, `.env.uat.example`, `.env.prod.example` | [.env.test.example](../.env.test.example), [.env.uat.example](../.env.uat.example), [.env.prod.example](../.env.prod.example) ; ils sont versionnés grâce à la règle `!.env.*.example` de [.gitignore](../.gitignore) (les copies `.env.test`, `.env.prod`... restent ignorées) | `git status` après `cp .env.test.example .env.test` : la copie n'apparaît pas |
+| Ports 8081 / 8082 / 80 | Variable `FRONTEND_PORT` de chaque fichier ; mapping `"${FRONTEND_PORT:-8080}:8080"` dans [docker-compose.yml](../docker-compose.yml) | `docker compose --env-file .env.uat.example ps` |
+| Durées de JWT 8 h / 2 h / 30 min | Variable `JWT_EXPIRES_IN` de chaque fichier, lue par [auth config.ts](../services/auth-service/src/config.ts) | Décoder un token : `exp` − `iat` = 28 800 s (TEST), 7 200 s (UAT), 1 800 s (PROD) |
+| Limites basses / moyennes / hautes | Variables `*_CPU_LIMIT` et `*_MEM_LIMIT` de chaque fichier (tableau dans le [README](../README.md#environnements)) | `docker inspect` des conteneurs de chaque environnement |
+| Bases distinctes | `POSTGRES_DB`, `POSTGRES_USER` et `DATABASE_URL` propres à chaque fichier (`marketplace_test`, `marketplace_uat`, `marketplace_prod`) et un volume par projet | `docker exec <db> psql -U marketplace_uat -d marketplace_uat -c "select current_database()"` |
+| `COMPOSE_PROJECT_NAME` distinct par environnement | Variable `COMPOSE_PROJECT_NAME` de chaque fichier (`marketplace-test`, `marketplace-uat`, `marketplace-prod`) : elle préfixe conteneurs, réseaux et volumes | `docker compose --env-file .env.uat.example config` affiche `name: marketplace-uat` |
+| Secrets PROD en `CHANGE_ME` | [.env.prod.example](../.env.prod.example) : `POSTGRES_PASSWORD`, `DATABASE_URL`, `JWT_SECRET` et `ADMIN_PASSWORD` | `grep CHANGE_ME .env.prod.example` |
+| TEST et UAT peuvent tourner en même temps | Projets, ports, réseaux et volumes distincts ; secrets JWT différents | Lancer les deux avec `--env-file` : 10 conteneurs `healthy`, un token TEST est refusé par UAT (401) |
+| Section « Environnements » du README | [README](../README.md#environnements) | — |
+
+### Conteneurs sans droits root
+
+| Exigence | Où elle est satisfaite | Comment le vérifier |
+|---|---|---|
+| Frontend non-root sur `nginxinc/nginx-unprivileged:stable-alpine`, port 8080 | [frontend/Dockerfile](../frontend/Dockerfile) (`FROM nginxinc/nginx-unprivileged`, `USER 101`, `EXPOSE 8080`, `HEALTHCHECK` sur le port 8080), [frontend/nginx.conf](../frontend/nginx.conf) (`listen 8080`), [docker-compose.yml](../docker-compose.yml) (mapping `${FRONTEND_PORT:-8080}:8080`) | `docker compose exec frontend id` : `uid=101(nginx)` |
+| Services Node et Python non-root | `USER 1000` dans [auth](../services/auth-service/Dockerfile) et [order](../services/order-service/Dockerfile), `USER 10001` dans [catalog](../services/catalog-service/Dockerfile) | `docker compose exec auth-service id -u` : `1000` |
+| Documentation | [README](../README.md#sécurité-des-conteneurs) : tableau des utilisateurs | — |
+
+### Versionnage
+
+| Exigence | Où elle est satisfaite | Comment le vérifier |
+|---|---|---|
+| Versions v0.9.0 → v1.0.0 | Section « Versionnage » du [README](../README.md#versionnage) : contenu de chaque version et procédure de création des tags | `git tag` (les tags se créent à la main) |
+| Un tag déclenche la publication d'images versionnées | Bloc `on.push.tags: ['*']` et étape « Tags et labels » (`type=ref,event=tag`) de [ci.yml](../.github/workflows/ci.yml) | Onglet Packages : image `…/frontend:v1.0.0` après le push du tag |
+
+### Limites connues
+
+| Exigence | Où elle est satisfaite |
+|---|---|
+| Documenter les limites : un seul utilisateur PostgreSQL, pas de HTTPS, pas d'orchestrateur, secrets en variables d'environnement | Section « Limites connues » du [README](../README.md#limites-connues), avec le risque de chaque limite (plus les limites fonctionnelles : paiement simulé, stock non décrémenté, un seul admin) |

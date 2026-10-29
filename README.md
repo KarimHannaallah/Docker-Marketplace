@@ -6,7 +6,7 @@ Chaque partie de l'application tourne dans son propre conteneur.
 
 | Partie | Technologie | Rôle |
 |---|---|---|
-| `frontend` | React 18, Vite, TypeScript, React Router, servi par nginx | Interface web, **seul point d'entrée** (reverse proxy) |
+| `frontend` | React 18, Vite, TypeScript, React Router, servi par nginx (sans droits root) | Interface web, **seul point d'entrée** (reverse proxy) |
 | `auth-service` | Node.js 24, Express, TypeScript | Comptes, login/logout, JWT, rôles STANDARD/ADMIN |
 | `catalog-service` | Python 3.12, FastAPI, SQLAlchemy | Catégories et produits |
 | `order-service` | Node.js 24, Express, TypeScript | Panier persistant, commandes |
@@ -151,6 +151,45 @@ admin) doivent être remplacées par des secrets générés avant le démarrage,
 Le mot de passe de la base apparaît deux fois (`POSTGRES_PASSWORD` et `DATABASE_URL`) : gardez-les identiques.
 Le port 80 doit être libre. Ne commitez jamais `.env.prod`.
 
+## Ressources des conteneurs
+
+Chaque conteneur a une **limite** (plafond qu'il ne peut pas dépasser) et une **réservation** (minimum garanti) de CPU et de
+mémoire, définies dans `docker-compose.yml` (`deploy.resources`) et réglables par variables (voir le tableau des variables).
+Valeurs par défaut, sans variable :
+
+| Service | Limite CPU | Limite mémoire | Réservation CPU | Réservation mémoire |
+|---|---|---|---|---|
+| `db` | 1 | 512 Mo | 0,25 | 256 Mo |
+| `auth-service`, `catalog-service`, `order-service` | 0,5 | 256 Mo | 0,1 | 128 Mo |
+| `frontend` | 0,25 | 128 Mo | 0,05 | 64 Mo |
+
+- **Dépassement de la mémoire** : le conteneur est tué par le noyau (OOM) puis relancé (`restart: unless-stopped`).
+  **Dépassement du CPU** : il est ralenti, jamais tué.
+- **Mesurer** : `docker stats --no-stream`. La colonne `MEM USAGE / LIMIT` doit afficher les limites ci-dessus
+  (256 Mo, 512 Mo, 128 Mo) et non la mémoire totale de la machine.
+- **Consommation observée** (pile démarrée) : `db` ≈ 42 Mo, `auth-service` ≈ 75 Mo, `catalog-service` ≈ 83 Mo
+  (≈ 111 Mo après 300 requêtes), `order-service` ≈ 22 Mo, `frontend` ≈ 12 Mo. Il reste donc de la marge.
+- La limite CPU, la limite mémoire et la réservation mémoire apparaissent dans la configuration du conteneur
+  (`docker inspect`). La **réservation CPU** est acceptée par Compose mais n'y apparaît pas (`CpuShares` reste à 0) :
+  Docker ne l'applique donc pas sur une seule machine.
+
+## Sécurité des conteneurs
+
+Aucun processus applicatif ne tourne en root :
+
+| Conteneur | Utilisateur du processus | Comment |
+|---|---|---|
+| `frontend` | `nginx` (uid 101) | image `nginxinc/nginx-unprivileged` : nginx écoute sur le port **8080** du conteneur (un utilisateur sans droits ne peut pas utiliser le port 80). Le port publié sur la machine reste `FRONTEND_PORT` |
+| `auth-service`, `order-service` | `node` (uid 1000) | `USER 1000` dans le Dockerfile |
+| `catalog-service` | `appuser` (uid 10001) | utilisateur créé dans le Dockerfile puis `USER 10001` |
+| `db` | `postgres` | image officielle PostgreSQL |
+
+Vérifier : `docker compose exec frontend id` affiche `uid=101(nginx)`, et `docker compose exec auth-service id -u` affiche `1000`.
+
+Autres protections : les backends et la base ne publient aucun port et vivent sur un réseau Docker interne ;
+les Dockerfiles passent **hadolint** ; les images sont scannées par **Trivy** avant publication ;
+les secrets sont absents du dépôt (**gitleaks**) et la base de code est analysée par **CodeQL**.
+
 ## Endpoints
 
 Chaque service expose `GET /health`. Depuis le navigateur, tous les appels passent par nginx avec le préfixe `/api`
@@ -248,13 +287,38 @@ Les tests unitaires n'ont besoin ni de PostgreSQL ni des autres services.
 
 - **`.github/workflows/ci.yml`**, sur chaque `push` (toutes les branches et tous les tags) et chaque `pull_request` :
   lint et tests des services, lint et build du frontend, **hadolint** sur les 4 Dockerfiles,
-  validation de `docker compose config`, **gitleaks** (secrets dans tout l'historique),
-  puis, si tout est vert, pour chacune des 4 images : build, scan **Trivy** (échec s'il reste une
-  vulnérabilité CRITICAL corrigeable), et publication sur GHCR.
+  validation de `docker compose config` **pour chaque environnement** (`.env.example`, `.env.test.example`,
+  `.env.uat.example`, `.env.prod.example` : le job échoue si une variable obligatoire manque), **gitleaks**
+  (secrets dans tout l'historique), puis, si tout est vert, pour chacune des 4 images : build, scan **Trivy**
+  (échec s'il reste une vulnérabilité CRITICAL corrigeable), et publication sur GHCR.
+- **`fail-fast: true`** sur les matrices Node, hadolint et images : dès qu'un job d'une matrice échoue, les autres sont
+  annulés. Aucun `continue-on-error` : la moindre erreur fait échouer le pipeline.
 - **`.github/workflows/codeql.yml`** : analyse statique CodeQL (JavaScript/TypeScript et Python).
 - Images publiées : `ghcr.io/karimhannaallah/docker-marketplace/<frontend|auth-service|catalog-service|order-service>`.
   Tags : `sha-<7 caractères du commit>` à chaque commit, le nom du tag git sur un push de tag, `latest` sur `main` seulement.
   Rien n'est publié sur une pull request.
+
+## Versionnage
+
+Les versions suivent le versionnage sémantique `vMAJEUR.MINEUR.CORRECTIF` et sont des **tags git** créés à la main sur `main`.
+
+| Version | Contenu |
+|---|---|
+| **v0.9.0** | Version fonctionnelle complète, avant durcissement : frontend et 3 services, Docker et Compose, CI (tests, lint, hadolint, Trivy, gitleaks, CodeQL) et documentation de base. Le `0.` indique qu'elle n'est pas encore considérée comme finale |
+| **v1.0.0** | Version livrée pour la démo : v0.9.0 + limites CPU et mémoire, environnements TEST, UAT et PROD, frontend sans droits root, CI en `fail-fast` avec validation de chaque environnement, documentation complète |
+
+Créer une version, depuis `main` à jour et une fois la CI verte :
+
+```bash
+git switch main && git pull
+git tag -a v1.0.0 -m "Version 1.0.0"
+git push origin v1.0.0
+```
+
+Le push du tag lance toute la CI, puis publie les 4 images avec les tags `v1.0.0` et `sha-<commit>` :
+`docker pull ghcr.io/karimhannaallah/docker-marketplace/frontend:v1.0.0`.
+`latest` suit `main` : un tag ne le modifie pas. Un tag publié ne doit jamais être déplacé ni réutilisé : en cas d'erreur,
+on publie un correctif (`v1.0.1`).
 
 ## Limites connues
 
@@ -262,8 +326,23 @@ Les tests unitaires n'ont besoin ni de PostgreSQL ni des autres services.
 - Le **stock n'est pas décrémenté** après une commande : il est seulement vérifié.
 - Un seul administrateur existe (celui du seed) : l'inscription crée toujours un compte STANDARD.
 - Un produit supprimé par un ADMIN est désactivé et n'apparaît plus dans l'administration : il ne peut pas être réactivé depuis l'interface.
-- Le JWT est dans `localStorage` (choix simple pour un frontend sans état, sensible à une faille XSS) ;
-  nginx écoute en HTTP, sans TLS.
+- Le JWT est dans `localStorage` (choix simple pour un frontend sans état, sensible à une faille XSS).
+
+**Limites d'infrastructure et de sécurité**
+
+- **Un seul utilisateur PostgreSQL** : les 3 services se connectent avec le même utilisateur et le même mot de passe
+  (`DATABASE_URL`). Les schémas `auth`, `catalog` et `orders` sont séparés, mais pas les droits : un service compromis pourrait
+  lire ou modifier les tables des autres. Une version plus sûre donnerait un utilisateur par schéma.
+- **Pas de HTTPS** : nginx écoute en HTTP. Le JWT et les mots de passe circulent donc en clair entre le navigateur et le serveur.
+  En production, il faudrait un terminateur TLS (certificat) devant nginx.
+- **Pas d'orchestrateur** : tout tourne avec Docker Compose sur une seule machine. Il n'y a ni haute disponibilité, ni mise à
+  l'échelle automatique, ni déploiement sans interruption. Les environnements TEST, UAT et PROD lancés sur la même machine
+  partagent ses ressources et ne sont donc pas réellement isolés.
+- **Secrets en variables d'environnement** : ils viennent de fichiers `.env`, et toute personne qui accède à la machine peut les
+  lire avec `docker inspect` ou `docker compose config`. Il n'y a ni Docker secrets ni gestionnaire de secrets. Les valeurs
+  d'exemple de TEST et d'UAT sont publiques dans le dépôt.
+- **Ressources** : les limites sont dimensionnées d'après des mesures sur un petit jeu d'essai (parcours complet et 300 requêtes),
+  pas d'après un vrai test de charge.
 
 ## Arborescence
 
@@ -278,7 +357,7 @@ Les tests unitaires n'ont besoin ni de PostgreSQL ni des autres services.
 ├── .github/workflows/        ci.yml (tests, lint, scans, images) et codeql.yml
 ├── db/init/01_schemas.sql    Schémas et tables PostgreSQL
 ├── docs/REQUIREMENTS.md      Exigences du sujet → fichier ou job CI qui les satisfait
-├── frontend/                 React + Vite, Dockerfile, nginx.conf
+├── frontend/                 React + Vite, Dockerfile, nginx.conf (nginx sans droits root, port 8080)
 └── services/
     ├── auth-service/         routes / services / repositories, tests Jest
     ├── catalog-service/      routers, models, security, seed, tests pytest
