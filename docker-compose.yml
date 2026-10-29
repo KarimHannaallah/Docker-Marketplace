@@ -25,6 +25,14 @@ services:
       interval: 5s
       timeout: 3s
       retries: 10
+    deploy:
+      resources:
+        limits:
+          cpus: "${DB_CPU_LIMIT:-1}"
+          memory: ${DB_MEM_LIMIT:-512M}
+        reservations:
+          cpus: "${DB_CPU_RESERVATION:-0.25}"
+          memory: ${DB_MEM_RESERVATION:-256M}
     networks: [backend]
     restart: unless-stopped
 
@@ -40,6 +48,14 @@ services:
     depends_on:
       db:
         condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          cpus: "${AUTH_CPU_LIMIT:-0.5}"
+          memory: ${AUTH_MEM_LIMIT:-256M}
+        reservations:
+          cpus: "${AUTH_CPU_RESERVATION:-0.1}"
+          memory: ${AUTH_MEM_RESERVATION:-128M}
     networks: [backend]
     restart: unless-stopped
 
@@ -54,6 +70,14 @@ services:
         condition: service_healthy
       auth-service:
         condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          cpus: "${CATALOG_CPU_LIMIT:-0.5}"
+          memory: ${CATALOG_MEM_LIMIT:-256M}
+        reservations:
+          cpus: "${CATALOG_CPU_RESERVATION:-0.1}"
+          memory: ${CATALOG_MEM_RESERVATION:-128M}
     networks: [backend]
     restart: unless-stopped
 
@@ -71,6 +95,14 @@ services:
         condition: service_healthy
       catalog-service:
         condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          cpus: "${ORDER_CPU_LIMIT:-0.5}"
+          memory: ${ORDER_MEM_LIMIT:-256M}
+        reservations:
+          cpus: "${ORDER_CPU_RESERVATION:-0.1}"
+          memory: ${ORDER_MEM_RESERVATION:-128M}
     networks: [backend]
     restart: unless-stopped
 
@@ -86,6 +118,14 @@ services:
         condition: service_healthy
       order-service:
         condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          cpus: "${FRONTEND_CPU_LIMIT:-0.25}"
+          memory: ${FRONTEND_MEM_LIMIT:-128M}
+        reservations:
+          cpus: "${FRONTEND_CPU_RESERVATION:-0.05}"
+          memory: ${FRONTEND_MEM_RESERVATION:-64M}
     networks: [frontend, backend]
     restart: unless-stopped
 
