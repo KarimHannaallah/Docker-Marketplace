@@ -5,7 +5,7 @@ import { orderRoutes } from './routes/orderRoutes';
 import type { CartService } from './services/cartService';
 import type { OrderService } from './services/orderService';
 
-/** Construit l'application à partir de dépendances injectées (donc testable). */
+/** Application Express ; les dépendances sont injectées pour les tests. */
 export function createApp(
   requireAuth: RequestHandler,
   cartService: CartService,

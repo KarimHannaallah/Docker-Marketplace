@@ -7,14 +7,13 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 
-# Dépendances d'abord (couche mise en cache tant que requirements.txt ne change pas).
-# On installe requirements.txt (production), pas requirements-dev.txt (pytest, ruff).
+# dépendances d'abord (cache) ; requirements.txt seulement, sans les outils de dev
 COPY requirements.txt ./
 RUN pip install -r requirements.txt
 
 COPY app ./app
 
-# Utilisateur sans privilèges : on évite de tourner en root.
+# utilisateur sans privilèges (uid 10001)
 RUN useradd --system --uid 10001 --no-create-home appuser
 USER 10001
 

@@ -1,6 +1,5 @@
-// Client HTTP unique : tous les appels à l'API passent par `api()`.
-// Il ajoute le header Authorization et réagit aux 401 (session expirée ou révoquée).
-// Le frontend est sans état côté serveur : le JWT n'existe que dans le navigateur.
+// client HTTP unique : ajoute le header Authorization et gère les 401 (session expirée ou révoquée).
+// le frontend est sans état : le JWT n'existe que dans le navigateur.
 
 const TOKEN_KEY = 'marketplace_token';
 

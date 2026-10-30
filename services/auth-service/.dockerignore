@@ -1,4 +1,4 @@
-# Ne pas envoyer au démon Docker ce qui est inutile (ou dangereux) dans l'image
+# exclus du contexte de build
 node_modules
 dist
 coverage

@@ -8,10 +8,10 @@ export function authRoutes(service: AuthService, limiters: RateLimiters): Router
   const router = Router();
   const requireAuth = authenticate(service);
 
-  // Limite générale sur toutes les routes de ce router (déclarée AVANT les routes).
+  // limite générale, déclarée avant les routes
   router.use(limiters.general);
 
-  // Limite stricte en plus sur les deux routes sensibles au brute force et à la création de comptes en masse.
+  // limite stricte en plus sur register et login
   router.post('/register', limiters.strict, async (req, res) => {
     const { name, email, password } = parseRegister(req.body);
     res.status(201).json(await service.register(name, email, password));

@@ -6,8 +6,8 @@ import { ErrorMessage, Loading } from '../components/Feedback';
 import { formatPrice } from '../format';
 import { useApi } from '../hooks/useApi';
 
-// Paiement SIMULÉ : le formulaire carte est purement décoratif, rien n'est envoyé au serveur.
-// Le clic sur « Payer » appelle POST /api/orders/checkout qui crée la commande en statut PAID.
+// paiement simulé : le formulaire carte est décoratif, rien n'est envoyé au serveur.
+// « Payer » appelle POST /api/orders/checkout, qui crée la commande en statut PAID.
 export function Checkout() {
   const navigate = useNavigate();
   const { data: cart, error, loading } = useApi(() => ordersApi.cart(), []);

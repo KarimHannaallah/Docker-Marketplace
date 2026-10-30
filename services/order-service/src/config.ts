@@ -13,10 +13,7 @@ function required(env: NodeJS.ProcessEnv, key: string): string {
   return value;
 }
 
-/**
- * Les adresses des autres services servent à construire des requêtes HTTP sortantes : une valeur erronée ou
- * malveillante (file://, javascript:, texte quelconque...) doit faire échouer le démarrage, pas être utilisée.
- */
+// une adresse invalide, ou qui n'est pas en http(s), fait échouer le démarrage
 function httpUrl(env: NodeJS.ProcessEnv, key: string, fallback: string): string {
   const value = env[key] ?? fallback;
   let url: URL;

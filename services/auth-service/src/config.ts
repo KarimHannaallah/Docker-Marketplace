@@ -1,13 +1,13 @@
 // Toute la configuration vient des variables d'environnement.
 import type { SignOptions } from 'jsonwebtoken';
 
-/** Limitation du nombre de requêtes par adresse IP (protection contre le brute force et les abus). */
+/** Limites de requêtes par adresse IP. */
 export interface RateLimitConfig {
   /** durée de la fenêtre de comptage, en millisecondes */
   windowMs: number;
-  /** requêtes maximum par IP et par fenêtre, sur l'ensemble des routes */
+  /** requêtes max par IP et par fenêtre, toutes routes confondues */
   max: number;
-  /** requêtes maximum par IP et par fenêtre sur /auth/register et /auth/login (plus strict) */
+  /** requêtes max par IP et par fenêtre sur /auth/register et /auth/login */
   authMax: number;
 }
 
@@ -29,7 +29,7 @@ function required(env: NodeJS.ProcessEnv, key: string): string {
   return value;
 }
 
-/** Lit un entier strictement positif ; une valeur invalide fait échouer le démarrage plutôt que d'être ignorée. */
+/** Entier strictement positif ; une valeur invalide fait échouer le démarrage. */
 function positiveInt(env: NodeJS.ProcessEnv, key: string, fallback: number): number {
   const raw = env[key];
   if (raw === undefined || raw === '') return fallback;

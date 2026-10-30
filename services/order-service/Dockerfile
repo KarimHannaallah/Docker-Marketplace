@@ -3,7 +3,7 @@
 # --- Étape 1 : build (avec les devDependencies : typescript, types...) ---
 FROM node:24-alpine AS build
 WORKDIR /app
-# On copie d'abord les manifestes : tant qu'ils ne changent pas, la couche npm ci est réutilisée (cache).
+# manifestes copiés d'abord : la couche npm ci reste en cache tant qu'ils ne changent pas
 COPY package.json package-lock.json ./
 RUN npm ci
 COPY tsconfig.json tsconfig.build.json ./
@@ -18,7 +18,7 @@ COPY package.json package-lock.json ./
 RUN npm ci --omit=dev && npm cache clean --force
 COPY --from=build /app/dist ./dist
 
-# L'utilisateur "node" (uid 1000) existe déjà dans l'image : on évite de tourner en root.
+# utilisateur node (uid 1000) déjà présent dans l'image : on ne tourne pas en root
 USER 1000
 EXPOSE 3002
 HEALTHCHECK --interval=10s --timeout=3s --start-period=15s --retries=5 \

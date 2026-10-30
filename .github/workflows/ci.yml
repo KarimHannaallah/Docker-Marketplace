@@ -105,7 +105,7 @@ jobs:
           # On teste tous les fichiers avant d'échouer, pour voir toutes les erreurs d'un coup.
           exit $status
 
-  # --- Détection de secrets (mots de passe, clés...) dans le code ET dans tout l'historique git ---
+  # --- Détection de secrets (mots de passe, clés...) dans le code et dans tout l'historique git ---
   gitleaks:
     name: Gitleaks (secrets)
     runs-on: ubuntu-latest
@@ -114,8 +114,7 @@ jobs:
         with:
           # Historique complet : un secret supprimé dans un commit récent reste visible dans les anciens.
           fetch-depth: 0
-      # L'outil tourne dans son image officielle (version fixée). Les variables GIT_CONFIG_*
-      # autorisent git à lire le dépôt monté, qui appartient à un autre utilisateur que le conteneur.
+      # image officielle en version fixée ; GIT_CONFIG_* autorise git à lire le dépôt monté (autre propriétaire)
       - name: Scan gitleaks
         run: |
           docker run --rm -v "$PWD:/repo:ro" \
@@ -124,7 +123,7 @@ jobs:
             --config /repo/.gitleaks.toml --redact --no-banner -v
 
   # --- Construction, analyse de sécurité (Trivy) et publication des 4 images sur GHCR ---
-  # Ne démarre que si TOUS les contrôles précédents ont réussi.
+  # Ne démarre que si tous les contrôles précédents ont réussi.
   docker:
     name: Docker image (${{ matrix.image }})
     runs-on: ubuntu-latest
@@ -155,10 +154,8 @@ jobs:
         id: name
         run: echo "image=ghcr.io/${GITHUB_REPOSITORY,,}/${{ matrix.image }}" >> "$GITHUB_OUTPUT"
 
-      # Tags :
-      #   sha-<7 premiers caractères du commit>  à chaque commit
-      #   <nom du tag git>                       sur un push de tag
-      #   latest                                 uniquement sur la branche main
+      # tags : sha-<7 caractères du commit> à chaque commit, nom du tag git sur un push de tag,
+      # et latest sur la branche main seulement
       - name: Tags et labels
         id: meta
         uses: docker/metadata-action@v6
@@ -171,7 +168,7 @@ jobs:
 
       - uses: docker/setup-buildx-action@v4
 
-      # 1) On construit l'image dans le runner (sans la publier) pour pouvoir l'analyser.
+      # 1) build local, sans publier, pour pouvoir analyser l'image
       - name: Build local pour l'analyse
         uses: docker/build-push-action@v7
         with:
@@ -182,9 +179,8 @@ jobs:
           cache-from: type=gha,scope=${{ matrix.image }}
           cache-to: type=gha,mode=max,scope=${{ matrix.image }}
 
-      # 2) Trivy : le job échoue s'il reste une vulnérabilité CRITICAL pour laquelle un correctif existe
-      #    (--ignore-unfixed ignore celles qu'on ne peut pas corriger : rien à faire dans ce cas).
-      #    Si le scan échoue, l'image N'EST PAS publiée.
+      # 2) Trivy échoue s'il reste une vulnérabilité CRITICAL avec correctif disponible (--ignore-unfixed)
+      #    en cas d'échec, l'image n'est pas publiée
       - name: Scan Trivy
         run: |
           docker run --rm -v /var/run/docker.sock:/var/run/docker.sock \

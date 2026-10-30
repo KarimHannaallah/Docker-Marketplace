@@ -2,7 +2,7 @@ import type { NextFunction, Request, RequestHandler, Response } from 'express';
 import { HttpError } from '../errors';
 import type { AuthContext, AuthService } from '../services/authService';
 
-// On attache le contexte d'authentification à la requête.
+// ajoute req.auth au type Request
 declare module 'express-serve-static-core' {
   interface Request {
     auth?: AuthContext;

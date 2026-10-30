@@ -35,10 +35,7 @@ export interface CartRepository {
 }
 
 export interface OrderRepository {
-  /**
-   * Crée la commande, ses lignes ET vide le panier en une seule transaction :
-   * soit tout réussit, soit rien n'est enregistré.
-   */
+  /** Crée la commande et ses lignes et vide le panier dans une seule transaction. */
   createFromCart(userId: number, status: OrderStatus, total: number, items: OrderItem[]): Promise<Order>;
   listByUser(userId: number): Promise<Order[]>;
   /** Ne retourne que les commandes de cet utilisateur. */

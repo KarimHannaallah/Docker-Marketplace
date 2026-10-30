@@ -14,7 +14,6 @@ export interface PublicUser {
   created_at: string;
 }
 
-/** Informations extraites d'un token valide. */
 export interface AuthContext {
   userId: number;
   role: Role;

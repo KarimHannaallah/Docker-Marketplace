@@ -3,11 +3,10 @@
 title = "marketplace gitleaks config"
 
 [extend]
-# On garde toutes les règles par défaut de gitleaks...
+# règles par défaut de gitleaks conservées
 useDefault = true
 
-# ...sauf pour les fichiers de tests, qui contiennent des secrets FACTICES
-# (ex. SECRET = "test-secret-..." pour signer des JWT de test). Ils ne protègent rien.
+# sauf dans les tests, qui contiennent des secrets factices
 [[allowlists]]
 description = "Secrets factices utilisés uniquement par les tests"
 paths = [

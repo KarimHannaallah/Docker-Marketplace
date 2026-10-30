@@ -4,9 +4,8 @@ import { HttpError } from './errors';
 const MAX_EMAIL_LENGTH = 255;
 const MAX_PASSWORD_BYTES = 72; // limite de bcrypt
 
-// Expression BORNÉE : chaque partie a une longueur maximale (local ≤ 64, domaine ≤ 190, suffixe ≤ 63).
-// Avec des quantificateurs non bornés (+), une chaîne très longue et bien choisie ferait travailler la regex
-// pendant très longtemps (ReDoS) ; ici le travail est borné quelle que soit l'entrée.
+// regex avec des longueurs maximales (local ≤ 64, domaine ≤ 190, suffixe ≤ 63) :
+// le temps de traitement reste borné quelle que soit l'entrée.
 const EMAIL_RE = /^[^\s@]{1,64}@[^\s@]{1,190}\.[^\s@]{1,63}$/;
 
 function asString(value: unknown): string {
@@ -20,7 +19,7 @@ export function parseRegister(body: unknown): { name: string; email: string; pas
   const password = asString(b.password);
 
   if (name.length < 1 || name.length > 100) throw new HttpError(400, 'Nom invalide (1 à 100 caractères)');
-  // La longueur est vérifiée AVANT la regex (et même avant trim/toLowerCase) : une entrée géante est rejetée sans traitement.
+  // longueur vérifiée avant la regex, et même avant trim/toLowerCase
   if (rawEmail.length > MAX_EMAIL_LENGTH) throw new HttpError(400, 'Email invalide');
   const email = rawEmail.trim().toLowerCase();
   if (email.length > MAX_EMAIL_LENGTH || !EMAIL_RE.test(email)) throw new HttpError(400, 'Email invalide');
@@ -34,8 +33,7 @@ export function parseLogin(body: unknown): { email: string; password: string } {
   const b = (body ?? {}) as Record<string, unknown>;
   const rawEmail = asString(b.email);
   const password = asString(b.password);
-  // Aucun compte ne peut avoir un email ou un mot de passe plus long que ces limites (voir parseRegister) :
-  // on rejette tout de suite les entrées géantes au lieu de les passer à la base ou à bcrypt.
+  // aucun compte n'a un email ou un mot de passe plus long : on rejette avant la base et bcrypt
   if (rawEmail.length > MAX_EMAIL_LENGTH || password.length > MAX_PASSWORD_BYTES) {
     throw new HttpError(400, 'Email ou mot de passe invalide');
   }

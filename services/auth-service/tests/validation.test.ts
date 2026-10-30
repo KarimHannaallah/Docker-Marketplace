@@ -21,7 +21,7 @@ const app = createApp(new AuthService(new InMemoryUserRepository(), new InMemory
 const registerWith = (email: string) =>
   request(app).post('/auth/register').send({ name: 'Al', email, password: 'password123' });
 
-// Une réponse "immédiate" : bien en dessous de la seconde, alors qu'une regex vulnérable mettrait des minutes.
+// réponse quasi immédiate : bien en dessous d'une seconde
 const FAST_MS = 1000;
 
 describe("validation de l'email : longueurs bornées (ReDoS)", () => {

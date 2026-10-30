@@ -18,7 +18,7 @@ function baseConfig(rateLimit: RateLimitConfig): Config {
   };
 }
 
-/** Crée une application neuve (donc des compteurs à zéro) avec les limites demandées. */
+/** Application neuve (compteurs à zéro) avec les limites données. */
 async function makeApp(rateLimit: RateLimitConfig) {
   const config = baseConfig(rateLimit);
   const service = new AuthService(new InMemoryUserRepository(), new InMemoryTokenRepository(), config);
@@ -85,7 +85,7 @@ describe('limite par adresse IP (derrière nginx)', () => {
 
   it('ignore une fausse adresse envoyée par le client : seule celle ajoutée par le proxy compte', async () => {
     const app = await makeApp({ windowMs: WINDOW, max: 1000, authMax: 2 });
-    // nginx AJOUTE l'adresse réelle à droite ; le client ne contrôle que ce qui est à gauche.
+    // nginx ajoute l'adresse réelle à droite ; le client ne contrôle que la partie gauche.
     const call = (spoofed: string) =>
       request(app).post('/auth/login').set('X-Forwarded-For', `${spoofed}, 198.51.100.7`).send({ email: 'x@test.com', password: 'mauvais-mdp-1' });
 

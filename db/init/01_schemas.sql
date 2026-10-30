@@ -1,16 +1,11 @@
--- Initialisation de la base : un schéma par service.
--- Exécuté automatiquement par l'image postgres au premier démarrage
--- (dossier /docker-entrypoint-initdb.d).
--- Pas de clé étrangère entre schémas : les services restent indépendants
--- et se parlent uniquement via HTTP.
+-- un schéma par service ; exécuté au premier démarrage de postgres (/docker-entrypoint-initdb.d).
+-- pas de clé étrangère entre schémas : les services se parlent uniquement en HTTP.
 
 CREATE SCHEMA IF NOT EXISTS auth;
 CREATE SCHEMA IF NOT EXISTS catalog;
 CREATE SCHEMA IF NOT EXISTS orders;
 
--- ---------------------------------------------------------------------------
 -- auth-service
--- ---------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS auth.users (
     id            SERIAL PRIMARY KEY,
     name          VARCHAR(100) NOT NULL,
@@ -27,9 +22,7 @@ CREATE TABLE IF NOT EXISTS auth.revoked_tokens (
     expires_at TIMESTAMPTZ NOT NULL
 );
 
--- ---------------------------------------------------------------------------
 -- catalog-service
--- ---------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS catalog.categories (
     id   SERIAL PRIMARY KEY,
     name VARCHAR(100) NOT NULL,
@@ -52,10 +45,7 @@ CREATE TABLE IF NOT EXISTS catalog.products (
 
 CREATE INDEX IF NOT EXISTS idx_products_category ON catalog.products(category_id);
 
--- ---------------------------------------------------------------------------
--- order-service
--- user_id et product_id référencent d'autres services : pas de FK.
--- ---------------------------------------------------------------------------
+-- order-service : user_id et product_id viennent d'autres services, donc pas de clé étrangère
 CREATE TABLE IF NOT EXISTS orders.cart_items (
     id         SERIAL PRIMARY KEY,
     user_id    INTEGER     NOT NULL,

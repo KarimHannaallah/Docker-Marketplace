@@ -1,10 +1,5 @@
-# Lancer toute l'application :  cp .env.example .env  puis  docker compose up --build
-# Application disponible sur http://localhost:8080 (port modifiable avec FRONTEND_PORT).
-#
-# Réseaux :
-#   frontend : réseau "public", seul le conteneur frontend (nginx) y est relié à l'extérieur
-#   backend  : réseau INTERNE (internal: true) : pas d'accès depuis l'extérieur, ni vers Internet
-# Seul le frontend publie un port : backends et base de données ne sont pas joignables par les clients.
+# lancement : cp .env.example .env, puis docker compose up --build
+# application sur http://localhost:8080 (port modifiable avec FRONTEND_PORT)
 
 name: marketplace
 
@@ -18,7 +13,7 @@ services:
     volumes:
       # Données conservées entre deux redémarrages
       - db-data:/var/lib/postgresql/data
-      # Scripts SQL exécutés UNE SEULE FOIS, à la création du volume (schémas auth, catalog, orders)
+      # scripts SQL exécutés une seule fois, à la création du volume
       - ./db/init:/docker-entrypoint-initdb.d:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
@@ -113,8 +108,7 @@ services:
   frontend:
     build: ./frontend
     ports:
-      # Seul port publié de toute l'application
-      # (nginx écoute sur 8080 dans le conteneur : sans droits root, il ne peut pas utiliser le port 80)
+      # seul port publié ; nginx écoute sur 8080 dans le conteneur (non-root, donc pas de port 80)
       - "${FRONTEND_PORT:-8080}:8080"
     depends_on:
       auth-service:
@@ -139,5 +133,6 @@ volumes:
 
 networks:
   frontend:
+  # réseau interne : pas d'accès depuis l'extérieur, seul le frontend publie un port
   backend:
     internal: true

@@ -6,8 +6,7 @@ import { parseId } from '../validation';
 
 export function adminRoutes(service: AuthService, limiters: RateLimiters): Router {
   const router = Router();
-  // La limite passe AVANT l'authentification : une requête sans token compte aussi (sinon on pourrait
-  // solliciter la base sans limite en envoyant des tokens invalides).
+  // avant authenticate : les requêtes sans token comptent aussi dans la limite
   router.use(limiters.general);
   router.use(authenticate(service), requireAdmin);
 

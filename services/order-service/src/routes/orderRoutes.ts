@@ -10,7 +10,7 @@ export function orderRoutes(
   orderService: OrderService,
 ): Router {
   const router = Router();
-  router.use(requireAuth); // toutes les routes exigent un JWT valide
+  router.use(requireAuth);
 
   // --- Panier (déclaré avant /:id pour que "cart" ne soit pas pris pour un id) ---
 

@@ -3,21 +3,14 @@ import { rateLimit } from 'express-rate-limit';
 import type { RateLimitConfig } from '../config';
 
 export interface RateLimiters {
-  /** limite générale, appliquée à toutes les routes d'un router */
+  /** limite appliquée à toutes les routes d'un router */
   general: RequestHandler;
-  /** limite stricte, pour les routes sensibles au brute force (/register et /login) */
+  /** limite plus stricte pour /register et /login */
   strict: RequestHandler;
 }
 
-/**
- * catalog-service et order-service appellent GET /auth/verify à CHAQUE requête authentifiée pour vérifier la
- * révocation du token. Ces appels viennent tous de la même adresse (celle du service) : les compter dans la limite
- * par IP bloquerait toute l'application après quelques dizaines de requêtes.
- *
- * On les reconnaît à l'absence de l'en-tête X-Forwarded-For : nginx l'ajoute à TOUTES les requêtes venant des
- * clients, alors qu'un appel interne entre services ne passe pas par nginx. Un client externe ne peut pas se faire
- * passer pour un appel interne : la route reste donc limitée quand elle est appelée depuis l'extérieur.
- */
+// catalog et order appellent GET /auth/verify à chaque requête : ces appels internes ne sont pas comptés.
+// on les reconnaît à l'absence de X-Forwarded-For, que nginx ajoute aux requêtes des clients.
 function isInternalVerifyCall(req: Request): boolean {
   return req.path === '/verify' && req.headers['x-forwarded-for'] === undefined;
 }

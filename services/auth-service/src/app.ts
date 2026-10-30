@@ -6,14 +6,12 @@ import { adminRoutes } from './routes/adminRoutes';
 import { authRoutes } from './routes/authRoutes';
 import type { AuthService } from './services/authService';
 
-/** Construit l'application Express à partir d'un service (injecté, donc testable). */
+/** Application Express ; le service est injecté pour pouvoir le remplacer dans les tests. */
 export function createApp(service: AuthService, rateLimit: RateLimitConfig): express.Express {
   const app = express();
 
-  // Le service est derrière UN proxy (nginx) : l'adresse du client vient de X-Forwarded-For, que nginx renseigne.
-  // Sans cela, toutes les requêtes auraient l'adresse de nginx et partageraient la même limite.
-  // La valeur 1 (un seul proxy de confiance) empêche un client de falsifier son IP en envoyant lui-même
-  // un en-tête X-Forwarded-For : Express ne retient que l'adresse ajoutée par nginx.
+  // derrière nginx (un seul proxy) : l'IP du client vient de X-Forwarded-For.
+  // avec 1 proxy de confiance, seule l'adresse ajoutée par nginx est retenue (non falsifiable).
   app.set('trust proxy', 1);
 
   app.use(express.json());

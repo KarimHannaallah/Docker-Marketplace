@@ -36,7 +36,7 @@ def auth(token: str) -> dict[str, str]:
 
 @pytest.fixture
 def db_session():
-    # Un seul "connexion" partagée (StaticPool) pour que la base en mémoire survive entre requêtes.
+    # une seule connexion partagée (StaticPool) : la base en mémoire survit entre les requêtes.
     engine = create_engine(
         "sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool
     )
