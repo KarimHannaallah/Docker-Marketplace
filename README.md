@@ -279,7 +279,7 @@ cd frontend                 && npm ci && npm run dev   # http://localhost:5173
 Le serveur de développement Vite joue le rôle de nginx : il redirige `/api/...` vers les ports locaux
 (modifiables avec `DEV_AUTH_URL`, `DEV_CATALOG_URL` et `DEV_ORDER_URL`, voir `frontend/vite.config.ts`).
 
-## Tests et lint
+## Tests unitaires et lint
 
 | Partie | Commandes (dans le dossier du service) | Tests |
 |---|---|---|
